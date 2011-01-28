@@ -1,6 +1,9 @@
 
 (ns clj-rewrite.rule
-  "Rule building for clj-rewrite")
+  "Rule building for clj-rewrite"
+  (:use clojure.walk))
+
+(def binds* nil)
 
 (defn- mapcat-pipe
   "Takes a sequence of functions [f1 f2 .. fm] and returns a function
@@ -58,7 +61,7 @@
 
 (defn- optional-match
   "Returns a sequence containing matches for an optional symbol"
-  [k state]
+  [k {:keys [match] :as state}]
   (if (contains? match k)
     (match-repeat k state)
     (cons state (single-match k state))))
@@ -79,7 +82,7 @@
 (declare make-match-generator)
 
 (defn- make-symbol-matcher
-  "Converts a symbols in a pattern into a function that matches against
+  "Converts symbol in a pattern into a function that matches against
    that symbol"
   [sym]
   (cond
@@ -127,11 +130,126 @@
   [k]
   (partial optional-match k))
 
+(defn sub
+  "Return the value for the match with the given key"
+  [k]
+  (fn [m] 
+    (let [ret (m k)]
+      (if (vector? ret) ret [ret]))))
+
+(defn build-list
+  "Build a list of results with the given contents"
+  [& contents]
+  (fn [m]
+    (apply list 
+           (mapcat (fn [x]
+                     (cond
+                       (fn? x)     (x m)
+                       (vector? x) x
+                       :else       [x])) 
+                   contents))))
+
+(defn- split-symbol
+  "Splits a symbol into name and last character strings.
+   Returns [name last-char] -sif last character is + or *
+   or returns [name nil]."
+  [s]
+  (let [as-str (str s)
+        end (.length as-str)
+        last-char (.substring as-str (dec end) end)]
+    (if (contains? #{"+" "*"} last-char)
+      [(.substring as-str 0 (dec end)) last-char]
+      [as-str nil])))
+
+(defn- convert-match-symbol
+  "Converts a symbol specifying a match into a functional
+   form"
+  [s]
+  (let [[name last-char] (split-symbol s)
+        k (keyword name)]
+    (set! binds* (conj binds* k))
+    (condp = last-char
+      "+"   `(match+ ~k)
+      "*"   `(match* ~k)
+      `(match ~k))))
+
+
+(declare convert-match-seq)
+
+(defn- convert-match-element
+  "Converts an element used for matching into a functional form"
+  [s]
+  (cond
+    (symbol? s)                      (convert-match-symbol s)
+    (and (seq? s) 
+         (not= 'quote (first s)))    (convert-match-seq s)
+    :else                            s))
+
+(defn- convert-match-seq
+  "Converts a sequence used for matching into a functional form"
+  [s]
+  (walk convert-match-element vec s))
+
+(defn- convert-match
+  "Converts a datastructure used to specify matches into
+   a functional form. Returns the new datastructure and
+   a vector of keys that will be set by matching." 
+  [ds]
+  (binding [binds* []]
+    (let [pattern (convert-match-seq ds)]
+      [pattern binds*])))
+
 (defn rule
   "Return a function that implements the given substitution rule."
-  ([pattern substitution] (rule* pattern nil substitution))
+  ([pattern subs-fn] (rule pattern nil subs-fn))
   ([pattern when-fn subs-fn]
      (let [match-fn (make-matcher pattern when-fn)]
        (fn [d]
          (if-let [m (match-fn d)]
            (subs-fn m))))))
+
+(defn- destructure-when
+  "Destructures a map from a match to provide bindings for a
+   when statement"
+  [binds]
+  (let [symbols (map #(-> % name symbol) binds)]
+    `{:keys [~@symbols]}))
+
+(defn- convert-when-fn
+  "Converts a when specification into a function"
+  [spec binds]
+  (let [destructuring (destructure-when binds)]
+    `(fn [m#]
+       (let [~destructuring m#]
+         ~spec))))
+
+(defn parse-rewrite
+  "Returns a sequence of rewrite rules in a functional form
+   from the spec of a def-rewrite"
+  [& raw]
+  (let [[match-spec when when-spec arrow sub-spec] (take 5 raw)]
+    (cond
+      ;---
+      (and (= :when when) (= :-> arrow))
+      (let [[pattern binds] (convert-match match-spec)
+            when-fn (convert-when when-spec binds)
+            subs-fn (convert-substitution sub-spec)]
+        (cons `(rule ~pattern ~when-fn ~subs-fn)
+              (lazy-seq (parse-rewrite (nthnext raw 5)))))
+      ;---
+      (= when :->)
+      (let [[pattern] (convert-match match-spec)
+            subs-fn (convert-substitution when-spec)]
+        (cons `(rule ~pattern ~subs-fn)
+              (lazy-seq (parse-rewrite (nthnext raw 3)))))
+      ;---
+      :else
+      (throw 
+       (.Exception 
+        (str "Malformed rule beginning with " math-spec))))))
+
+;; TODO: support optional documentation string
+(defmacro def-rewrite
+  "Defines a set of rewrite rules"
+  [& raw]
+  )
