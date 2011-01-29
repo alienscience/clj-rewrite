@@ -196,7 +196,9 @@
    a vector of keys that will be set by matching." 
   [ds]
   (binding [binds* []]
-    (let [pattern (convert-match-seq ds)]
+    (let [pattern (apply vector
+                         (list 'quote (first ds))
+                         (convert-match-seq (next ds)))]
       [pattern binds*])))
 
 (defn rule
@@ -215,8 +217,8 @@
   (let [symbols (map #(-> % name symbol) binds)]
     `{:keys [~@symbols]}))
 
-(defn- convert-when-fn
-  "Converts a when specification into a function"
+(defn- build-when-fn
+  "Converts a when specification into a function definition"
   [spec binds]
   (let [destructuring (destructure-when binds)]
     `(fn [m#]
@@ -227,26 +229,26 @@
   "Returns a sequence of rewrite rules in a functional form
    from the spec of a def-rewrite"
   [& raw]
-  (let [[match-spec when when-spec arrow sub-spec] (take 5 raw)]
+  (let [[match-spec when when-spec sub-spec] (take 5 raw)]
     (cond
       ;---
-      (and (= :when when) (= :-> arrow))
+      (and (= :when when))
       (let [[pattern binds] (convert-match match-spec)
-            when-fn (convert-when when-spec binds)
+            when-fn (build-when-fn when-spec binds)
             subs-fn (convert-substitution sub-spec)]
         (cons `(rule ~pattern ~when-fn ~subs-fn)
               (lazy-seq (parse-rewrite (nthnext raw 5)))))
       ;---
-      (= when :->)
+      (not (nil? when))
       (let [[pattern] (convert-match match-spec)
-            subs-fn (convert-substitution when-spec)]
+            subs-fn (convert-substitution when)]
         (cons `(rule ~pattern ~subs-fn)
-              (lazy-seq (parse-rewrite (nthnext raw 3)))))
+              (lazy-seq (parse-rewrite (nthnext raw 2)))))
       ;---
       :else
       (throw 
        (.Exception 
-        (str "Malformed rule beginning with " math-spec))))))
+        (str "Malformed rule beginning with " match-spec))))))
 
 ;; TODO: support optional documentation string
 (defmacro def-rewrite

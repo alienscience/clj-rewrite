@@ -41,7 +41,10 @@
 (defn- left-most-inner
   "Apply the given substitutions to the given zipper moving from leaves
    to root in a left to right order. Returns the root node after any
-   substitutions."
+   substitutions.
+
+   Currently, \\(\sim(n+r)\\) where \\(n\\) is the number of nodes/elements
+   in the expression tree and \\(r\\) is the number of rewrites."
   [zipper s]
   (loop [current (bottom-left zipper)]
     (if-let [new-node (substitute-node current s)]
