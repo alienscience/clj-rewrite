@@ -225,6 +225,33 @@
        (let [~destructuring m#]
          ~spec))))
 
+(defn- get-builder
+  "Returns symbol identifying the function to build the 
+   given substitution specification"
+  [sub-spec head]
+  (cond
+    ;;---
+    (list? sub-spec)    
+    ['build-list 
+     (if (symbol? head) 
+       '(quote head) 
+       (convert-sub-element head)))]
+    ;;---
+    :else
+    (throw
+     (.Exception 
+      (str "Don't know how to build a subtitution from "
+           (type sub-spec))))))
+
+(defn- convert-substitution
+  "Converts a substitution specification into a function
+   definition"
+  [sub-spec]
+  (let [builder (get-builder sub-spec (first sub-spec))
+        s (map convert-sub-element (next sub-spec))])
+  `(~@builder ~@s))
+
+
 (defn parse-rewrite
   "Returns a sequence of rewrite rules in a functional form
    from the spec of a def-rewrite"
