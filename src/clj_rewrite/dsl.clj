@@ -85,32 +85,22 @@
     (seq? e)       (convert-substitution e)
     :else          e))
 
-(defn- get-builder
-  "Returns symbol identifying the function to build the 
-   given substitution specification"
-  [sub-spec first-element]
-  (cond
-    ;;---
-    (list? sub-spec)    
-    ['clj-rewrite.rule/build-list 
-     (if (symbol? first-element) 
-       (list 'quote first-element) 
-       (convert-sub-element first-element))]
-    ;;---
-    :else
-    (throw
-     (.Exception 
-      (str "Don't know how to build a subtitution from "
-           (type sub-spec))))))
-
 (defn- convert-substitution
   "Converts a substitution specification into a function
    definition"
   [sub-spec]
-  (let [builder (get-builder sub-spec (first sub-spec))
-        s (map convert-sub-element (next sub-spec))]
-    `(~@builder ~@s)))
-
+  (cond
+    ;;---
+    (list? sub-spec)
+    (let [first-element (first sub-spec)
+          arg1 (if (symbol? first-element)
+                 (list 'quote first-element)
+                 (convert-sub-element first-element))
+          args (map convert-sub-element (next sub-spec))]
+      `(build-list ~arg1 ~@args))
+    ;;---
+    :else
+    `(return-element ~(convert-sub-element sub-spec))))
 
 (defn parse-rewrite
   "Returns a sequence of rewrite rules in a functional form

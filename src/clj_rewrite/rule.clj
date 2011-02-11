@@ -148,6 +148,17 @@
                        :else       [x])) 
                    contents))))
 
+(defn return-element
+  "Return a single element"
+  [e]
+  (fn [m]
+    (cond
+      (fn? e)     (let [res (e m)]
+                    (if (> (count res) 1)
+                      res
+                      (first res)))
+      :else       e)))
+
 (defn rule
   "Return a function that implements the given substitution rule."
   ([pattern subs-fn] (rule pattern nil subs-fn))
