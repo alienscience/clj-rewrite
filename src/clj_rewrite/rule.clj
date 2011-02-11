@@ -225,17 +225,27 @@
        (let [~destructuring m#]
          ~spec))))
 
+(declare convert-substitution)
+
+(defn- convert-sub-element
+  "Converts an element of a substitution into functional form"
+  [e]
+  (cond
+    (symbol? e)    `(sub ~(keyword e))
+    (seq? e)       (convert-substitution e)
+    :else          e))
+
 (defn- get-builder
   "Returns symbol identifying the function to build the 
    given substitution specification"
-  [sub-spec head]
+  [sub-spec first-element]
   (cond
     ;;---
     (list? sub-spec)    
     ['build-list 
-     (if (symbol? head) 
-       '(quote head) 
-       (convert-sub-element head)))]
+     (if (symbol? first-element) 
+       (list 'quote first-element) 
+       (convert-sub-element first-element))]
     ;;---
     :else
     (throw
@@ -248,34 +258,35 @@
    definition"
   [sub-spec]
   (let [builder (get-builder sub-spec (first sub-spec))
-        s (map convert-sub-element (next sub-spec))])
-  `(~@builder ~@s))
+        s (map convert-sub-element (next sub-spec))]
+    `(~@builder ~@s)))
 
 
 (defn parse-rewrite
   "Returns a sequence of rewrite rules in a functional form
    from the spec of a def-rewrite"
   [& raw]
-  (let [[match-spec when when-spec sub-spec] (take 5 raw)]
-    (cond
-      ;---
-      (and (= :when when))
-      (let [[pattern binds] (convert-match match-spec)
-            when-fn (build-when-fn when-spec binds)
-            subs-fn (convert-substitution sub-spec)]
-        (cons `(rule ~pattern ~when-fn ~subs-fn)
-              (lazy-seq (parse-rewrite (nthnext raw 5)))))
-      ;---
-      (not (nil? when))
-      (let [[pattern] (convert-match match-spec)
-            subs-fn (convert-substitution when)]
-        (cons `(rule ~pattern ~subs-fn)
-              (lazy-seq (parse-rewrite (nthnext raw 2)))))
-      ;---
-      :else
-      (throw 
-       (.Exception 
-        (str "Malformed rule beginning with " match-spec))))))
+  (if-not (empty? raw)
+    (let [[match-spec when when-spec sub-spec] (take 4 raw)]
+      (cond
+        ;---
+        (and (= :when when))
+        (let [[pattern binds] (convert-match match-spec)
+              when-fn (build-when-fn when-spec binds)
+              subs-fn (convert-substitution sub-spec)]
+          (cons `(rule ~pattern ~when-fn ~subs-fn)
+                (lazy-seq (parse-rewrite (nthnext raw 4)))))
+        ;---
+        (not (nil? when))
+        (let [[pattern] (convert-match match-spec)
+              subs-fn (convert-substitution when)]
+          (cons `(rule ~pattern ~subs-fn)
+                (lazy-seq (apply parse-rewrite (nthnext raw 2)))))
+        ;---
+        :else
+        (throw 
+         (.Exception 
+          (str "Malformed rule beginning with " match-spec)))))))
 
 ;; TODO: support optional documentation string
 (defmacro def-rewrite
