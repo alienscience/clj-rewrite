@@ -265,7 +265,7 @@
 (defn parse-rewrite
   "Returns a sequence of rewrite rules in a functional form
    from the spec of a def-rewrite"
-  [& raw]
+  [raw]
   (if-not (empty? raw)
     (let [[match-spec when when-spec sub-spec] (take 4 raw)]
       (cond
@@ -281,7 +281,7 @@
         (let [[pattern] (convert-match match-spec)
               subs-fn (convert-substitution when)]
           (cons `(rule ~pattern ~subs-fn)
-                (lazy-seq (apply parse-rewrite (nthnext raw 2)))))
+                (lazy-seq (parse-rewrite (nthnext raw 2)))))
         ;---
         :else
         (throw 
@@ -291,5 +291,13 @@
 ;; TODO: support optional documentation string
 (defmacro def-rewrite
   "Defines a set of rewrite rules"
-  [& raw]
-  )
+  [identifier & body]
+  (let [h (first body)
+        doc-string (if (string? h) h)]
+    (if doc-string
+      (let [func-form (parse-rewrite (next body))]
+        `(def ~(with-meta identifier {:doc doc-string})
+              [~@func-form]))
+      (let [func-form (parse-rewrite body)]
+        `(def ~identifier
+              [~@func-form])))))
