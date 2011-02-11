@@ -156,3 +156,10 @@
        (fn [d]
          (if-let [m (match-fn d)]
            (subs-fn m))))))
+
+(defn combine
+  "Combine a sequence of rules into a single rule"
+  [& rules]
+  (fn [x]
+    (first (remove nil?
+                   (map #(% x) rules)))))

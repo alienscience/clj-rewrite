@@ -92,7 +92,7 @@
   (cond
     ;;---
     (list? sub-spec)    
-    ['build-list 
+    ['clj-rewrite.rule/build-list 
      (if (symbol? first-element) 
        (list 'quote first-element) 
        (convert-sub-element first-element))]
@@ -146,7 +146,7 @@
     (if doc-string
       (let [func-form (parse-rewrite (next body))]
         `(def ~(with-meta identifier {:doc doc-string})
-              [~@func-form]))
+              (combine ~@func-form)))
       (let [func-form (parse-rewrite body)]
         `(def ~identifier
-              [~@func-form])))))
+              (combine ~@func-form))))))
