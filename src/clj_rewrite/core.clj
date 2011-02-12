@@ -10,22 +10,21 @@
 (def *verbose* true)
 
 (defn- substitute-node
-  "Match the given sequence of substitutions to the current node in the
-   given zipper. If a substitution matches, make the substitution and
-   return a modified zipper. If no substititions match, return nil." 
-  [zipper s]
-  (set! *substitute-limit* (dec *substitute-limit*))
-  (if (< *substitute-limit* 0)
-    (throw (Exception. "Exceeded maximum calls to substitute")))
+  "match the given rule to the current node in the
+   given zipper. if a substitution is made return a modified zipper.
+   if no substitition is made, return nil." 
+  [zipper rule]
   (let [node (zip/node zipper)]
-    (when *verbose* (println "Considering" node))
-    (loop [i 0]
-      (if (< i (count s))
-        (let [substitute (nth s i)
-              res (substitute node)]
-          (if res
-            (zip/replace zipper res)
-            (recur (inc i))))))))
+    (if (coll? node)
+      (do
+        (set! *substitute-limit* (dec *substitute-limit*))
+        (if (< *substitute-limit* 0)
+          (throw (Exception. "Exceeded maximum calls to substitute")))
+        (when *verbose* (println "considering" node))
+        (if-let [res (rule node)]
+          (do
+            (when *verbose* (println "  ->" res))
+            (zip/replace zipper res)))))))
 
 (defn- bottom-left
   "Move to the bottom left of the given zipper, returns nil if the zipper
@@ -39,15 +38,12 @@
         (recur down (zip/down down))))))
 
 (defn- left-most-inner
-  "Apply the given substitutions to the given zipper moving from leaves
+  "Apply the given rule to the given zipper moving from leaves
    to root in a left to right order. Returns the root node after any
-   substitutions.
-
-   Currently, \\(\sim(n+r)\\) where \\(n\\) is the number of nodes/elements
-   in the expression tree and \\(r\\) is the number of rewrites."
-  [zipper s]
+   substitutions."
+  [zipper rule]
   (loop [current (bottom-left zipper)]
-    (if-let [new-node (substitute-node current s)]
+    (if-let [new-node (substitute-node current rule)]
       (recur new-node)
       (let [dive (-> current zip/right bottom-left)]
         (if dive
@@ -57,9 +53,9 @@
             (zip/root current)))))))
 
 (defn rewrite
-  "Rewrites the given datastructure using the given rules"
-  [d rules & {:keys [limit verbose]}]
+  "Rewrites the given datastructure using the given rule"
+  [d rule & {:keys [limit verbose]}]
   (binding [*substitute-limit* (or limit *substitute-limit*)
             *verbose* (or verbose *verbose*)]
-    (left-most-inner (zip/seq-zip d) rules)))
+    (left-most-inner (zip/seq-zip d) rule)))
 
