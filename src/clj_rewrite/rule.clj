@@ -78,22 +78,32 @@
   (if (empty? todo)
     [state]))
 
+(defn- match-subseq
+  "Match against a subsequence"
+  [match-fn {:keys [match todo]}]
+  (if-let [current (first todo)]
+    (if (coll? current)
+      (let [n (next todo)]
+        (for [new-state (match-fn {:match match :todo current})
+              :let [new-match (:match new-state)]]
+          {:match new-match :todo n})))))
+
 (declare make-match-generator)
 
-(defn- make-symbol-matcher
-  "Converts symbol in a pattern into a function that matches against
-   that symbol"
-  [sym]
+(defn- make-element-matcher
+  "Converts an element in a pattern into a function that matches against
+   that element"
+  [el]
   (cond
-    (fn? sym)       sym
-    (vector? sym)   (make-match-generator sym)
-    :else           (partial match-equals sym)))
+    (fn? el)        el
+    (vector? el)    (partial match-subseq (make-match-generator el))
+    :else           (partial match-equals el)))
 
 (defn- make-match-generator
   "Converts a pattern into a function that returns a sequence of
    matches to that pattern."
   [pattern]
-  (let [fns (map make-symbol-matcher (conj pattern match-end))]
+  (let [fns (map make-element-matcher (conj pattern match-end))]
     (mapcat-pipe fns)))
 
 (defn- make-matcher
@@ -132,21 +142,27 @@
 (defn sub
   "Return the value for the match with the given key"
   [k]
-  (fn [m] 
-    (let [ret (m k)]
-      (if (vector? ret) ret [ret]))))
+  (fn [m]
+    (m k)))
+
+(defn mapcat-content
+  "Return the given content in a form suitable for putting into a mapcat 
+   for the given match"
+  [m c]
+  (cond
+    (fn? c)      (let [ret (c m)]
+                   (cond
+                     (vector? ret)    ret
+                     :else            [ret]))
+    (vector? c)  c
+    :else        [c]))
 
 (defn build-list
   "Build a list of results with the given contents"
   [& contents]
   (fn [m]
     (apply list 
-           (mapcat (fn [x]
-                     (cond
-                       (fn? x)     (x m)
-                       (vector? x) x
-                       :else       [x])) 
-                   contents))))
+           (mapcat (partial mapcat-content m) contents))))
 
 (defn return-element
   "Return a single element"
@@ -154,9 +170,11 @@
   (fn [m]
     (cond
       (fn? e)     (let [res (e m)]
-                    (if (> (count res) 1)
-                      res
-                      (first res)))
+                    (if (coll? res)
+                      (if (> (count res) 1)
+                        res
+                        (first res))
+                      res))
       :else       e)))
 
 (defn rule

@@ -10,9 +10,9 @@
 (def *verbose* true)
 
 (defn- substitute-node
-  "match the given rule to the current node in the
-   given zipper. if a substitution is made return a modified zipper.
-   if no substitition is made, return nil." 
+  "Match the given rule to the current node in the
+   given zipper. If a substitution is made return a modified zipper.
+   If no substitition is made, return nil." 
   [zipper rule]
   (let [node (zip/node zipper)]
     (if (coll? node)
@@ -44,7 +44,7 @@
   [zipper rule]
   (loop [current (bottom-left zipper)]
     (if-let [new-node (substitute-node current rule)]
-      (recur new-node)
+      (recur (bottom-left new-node))
       (let [dive (-> current zip/right bottom-left)]
         (if dive
           (recur dive)

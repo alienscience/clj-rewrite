@@ -30,21 +30,23 @@
       `(match ~k))))
 
 
-(declare convert-match-seq)
+(declare convert-match-coll)
 
 (defn- convert-match-element
   "Converts an element used for matching into a functional form"
   [s]
   (cond
     (symbol? s)                      (convert-match-symbol s)
-    (and (seq? s) 
-         (not= 'quote (first s)))    (convert-match-seq s)
+    (and (coll? s) 
+         (not= 'quote (first s)))    (convert-match-coll s)
     :else                            s))
 
-(defn- convert-match-seq
-  "Converts a sequence used for matching into a functional form"
+(defn- convert-match-coll
+  "Converts a collection used for matching into a functional form"
   [s]
-  (walk convert-match-element vec s))
+  (apply vector
+         (list 'quote (first s))
+         (walk convert-match-element vec (next s))))
 
 (defn- convert-match
   "Converts a datastructure used to specify matches into
@@ -52,11 +54,8 @@
    a vector of keys that will be set by matching." 
   [ds]
   (binding [binds* []]
-    (let [pattern (apply vector
-                         (list 'quote (first ds))
-                         (convert-match-seq (next ds)))]
-      [pattern binds*])))
-
+    (let [pattern (convert-match-coll ds)]
+      [pattern (distinct binds*)])))
 
 
 (defn- destructure-when
@@ -82,8 +81,8 @@
   [e]
   (cond
     (symbol? e)    `(sub ~(keyword e))
-    (seq? e)       (convert-substitution e)
-    :else          e))
+    (coll? e)       (convert-substitution e)
+    :else           e))
 
 (defn- convert-substitution
   "Converts a substitution specification into a function
