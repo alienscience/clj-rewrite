@@ -2,6 +2,7 @@
 (ns clj-rewrite.cas
   "Simple computer algebraic system"
   (:use clj-rewrite.dsl)
+  (:require [clj-rewrite.rule :as rule])
   (:use clj-rewrite.core))
 
 ;; TODO: move into a separate project
@@ -35,4 +36,7 @@
   (d x _) :when (number? x)     0 
   (d x x)                       1
   (d x y) :when (free-of? x y)  0
-  (d (+ e1 e2) v)               (+ (d e1 v) (d e2 v)))
+  (d (+ xs*) y)                 (+ (each x xs (d x y)))
+  (d (* xs*) y)                 (+ (each x xs (* (d x y) xs))))
+
+(def cas (rule/combine identities d))

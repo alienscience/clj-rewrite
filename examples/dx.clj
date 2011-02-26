@@ -8,10 +8,11 @@
   (* a* (+ xs*) b*)     (+ (foreach x xs (* a x b))))
 
 ;; Above rule in functional form
-(rule ['* (match* :a) ['+ (match* :x)] (match* :b)]
+(rule ['* (match* :a) ['+ (match* :xs)] (match* :b)]
       (build-list '+
-                  (for [x xs]
-                    (build-list '* (sub :a) x (sub :b)))))
+                  (fn [m]
+                    (for [x (:xs m)]
+                      (build-list '* (sub :a) x (sub :b))))))
 
 ;; Multiply fractions
 (def-rewrite multiply-fractions
@@ -49,5 +50,10 @@
   (d x _) :when (number? x)     0 
   (d x x)                       1
   (d x y) :when (free-of? x y)  0
-  (d (+ e1 e2) v)               (+ (d e1 v) (d e2 v)))
+  (d (+ xs*) v)                 (+ (foreach x xs (d x v))))
 
+;; Last rule in functional form
+(rule ['d ['+ (match* :xs)] (match :v)]
+      (build-list '+
+                  (foreach :x :xs
+                           (build-list 'd (sub :x) (sub :v)))))  

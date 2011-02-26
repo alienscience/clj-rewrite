@@ -147,7 +147,7 @@
 
 (defn mapcat-content
   "Return the given content in a form suitable for putting into a mapcat 
-   for the given match"
+   for the given match."
   [m c]
   (cond
     (fn? c)      (let [ret (c m)]
@@ -163,6 +163,20 @@
   (fn [m]
     (apply list 
            (mapcat (partial mapcat-content m) contents))))
+
+(defn each
+  "Runs the given function with each value in the match (with key ks)
+   removed."
+  [k ks f]
+  (fn [m]
+    (let [vals (m ks)]
+      (vec
+       (for [i (range (count vals))
+             :let [kval (nth vals i)
+                   others (vec (concat (subvec vals 0 i)
+                                       (subvec vals (inc i))))]]
+         (f (merge m {k kval ks others})))))))
+
 
 (defn return-element
   "Return a single element"

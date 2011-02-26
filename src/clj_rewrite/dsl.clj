@@ -84,20 +84,32 @@
     (coll? e)       (convert-substitution e)
     :else           e))
 
+(defn- convert-each
+  "Converts a foreach into functional form"
+  [x xs & body]
+  (let [x-key (keyword x)
+        xs-key (keyword xs)
+        body-fns (map convert-sub-element body)]
+    `(each ~x-key ~xs-key ~@body-fns)))
+
+(defn- convert-substitution-list
+  "Converts a list, describing a substitution, into functional form"
+  [sub-spec]
+  (let [first-element (first sub-spec)]
+    (if (= first-element 'each)
+      (apply convert-each (next sub-spec))
+      (let [arg1 (if (symbol? first-element)
+                   (list 'quote first-element)
+                   (convert-sub-element first-element))
+            args (map convert-sub-element (next sub-spec))]
+        `(build-list ~arg1 ~@args)))))
+
 (defn- convert-substitution
   "Converts a substitution specification into a function
    definition"
   [sub-spec]
   (cond
-    ;;---
-    (list? sub-spec)
-    (let [first-element (first sub-spec)
-          arg1 (if (symbol? first-element)
-                 (list 'quote first-element)
-                 (convert-sub-element first-element))
-          args (map convert-sub-element (next sub-spec))]
-      `(build-list ~arg1 ~@args))
-    ;;---
+    (list? sub-spec)    (convert-substitution-list sub-spec)
     :else
     `(return-element ~(convert-sub-element sub-spec))))
 
