@@ -52,6 +52,7 @@
             (recur rise)
             (zip/root current)))))))
 
+
 (defn rewrite
   "Rewrites the given datastructure using the given rule"
   [d rule & {:keys [limit verbose]}]

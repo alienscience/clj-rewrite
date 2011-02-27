@@ -151,3 +151,5 @@
       (let [func-form (parse-rewrite body)]
         `(def ~identifier
               (combine ~@func-form))))))
+
+(def combine-rules combine)

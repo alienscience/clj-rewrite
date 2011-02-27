@@ -206,3 +206,13 @@
   (fn [x]
     (first (remove nil?
                    (map #(% x) rules)))))
+
+
+(defn edit-rules
+  "Return a function that implements the given edit rules"
+  [& rules]
+  (let [editor (lazy-pipe rules)]
+    (fn [d]
+      (let [{:keys edit? s} (editor {:edit? false :s (seq d)})]
+        (if edit?
+          (apply list s))))))

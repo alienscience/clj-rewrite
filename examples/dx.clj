@@ -5,14 +5,12 @@
 
 ;; Example of distributive rule
 (def-rewrite distributive-rule
-  (* a* (+ xs*) b*)     (+ (foreach x xs (* a x b))))
+  (* a* (+ xs*) b*)     (+ (each x xs (* a x b))))
 
 ;; Above rule in functional form
 (rule ['* (match* :a) ['+ (match* :xs)] (match* :b)]
-      (build-list '+
-                  (fn [m]
-                    (for [x (:xs m)]
-                      (build-list '* (sub :a) x (sub :b))))))
+      (build-list '+ (each :x :xs
+                           (build-list '* (sub :a) (sub :x) (sub :b)))))
 
 ;; Multiply fractions
 (def-rewrite multiply-fractions
@@ -43,6 +41,11 @@
   (* _ 0)     0
   (* 0 _)     0)
 
+;; Examples above in functional form
+(edit-rules
+ (edit-rule ['+] [(match :a) 0] nil (sub :a))
+ (edit-rule ['*] [0 (match :_)] nil 0))
+
 ;; Example of differentiation
 
 (def-rewrite d
@@ -50,10 +53,8 @@
   (d x _) :when (number? x)     0 
   (d x x)                       1
   (d x y) :when (free-of? x y)  0
-  (d (+ xs*) v)                 (+ (foreach x xs (d x v))))
+  (d (+ xs*) v)                 (+ (each x xs (d x v))))
 
 ;; Last rule in functional form
 (rule ['d ['+ (match* :xs)] (match :v)]
-      (build-list '+
-                  (foreach :x :xs
-                           (build-list 'd (sub :x) (sub :v)))))  
+      (build-list '+ (each :x :xs (build-list 'd (sub :x) (sub :v)))))  
